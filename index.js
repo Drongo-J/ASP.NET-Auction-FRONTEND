@@ -9,10 +9,15 @@ let roomsContainer = document.getElementById("rooms");
 let currentUser = "";
 var lastOffer = 0;
 var roomname = document.getElementById("roomname");
+var _name = document.getElementById("name");
 let myName = '';
 let currentValue = document.querySelector("#currentValue");
 let time = document.querySelector("#time");
 var offerOwner = '';
+var chat = document.getElementById("chatBox");
+var chatContainer = document.getElementById('chatContainer');
+var messageInput = document.getElementById('messageInput');
+var sendButton = document.getElementById('sendButton');
 
 function GetRooms() {
     $.get("https://localhost:7115/GetRooms", function (rooms) {
@@ -34,34 +39,46 @@ function GetRooms() {
 }
 
 async function Join(roomname) {
-    currentUser = document.getElementById("username").value;
-    if (currentUser.trim() == "") {
-        alert("Please enter your name before joining the room.");
-        return;
-    }
-    myName = currentUser;
     CURRENTROOM = roomname;
-    room.style.display = "block";
+    $.get("https://localhost:7115/GetNumberOfUsers?room=" + CURRENTROOM)
+        .done(async function (count) {
+            console.log(count);
+            if (count >= 3) {
+                alert("Cannot join to the room. The room already has at least 3 people.");
+                return;
+            }
+            currentUser = document.getElementById("username").value;
+            if (currentUser.trim() == "") {
+                alert("Please enter your name before joining the room.");
+                return;
+            }
+            myName = currentUser;
+            _name.innerHTML = "USER : " + myName;
+            room.style.display = "block";
 
-    // Clear the existing child nodes
-    while (roomsContainer.firstChild) {
-        roomsContainer.removeChild(roomsContainer.firstChild);
-    }
-    var button = document.createElement('button');
-    button.textContent = 'Leave Room: ' + CURRENTROOM;
-    button.addEventListener('click', function () {
-        // Function to execute when the button is clicked
-        leaveRoom(CURRENTROOM);
-    });
-    roomsContainer.appendChild(button);
+            // Clear the existing child nodes
+            while (roomsContainer.firstChild) {
+                roomsContainer.removeChild(roomsContainer.firstChild);
+            }
+            var button = document.createElement('button');
+            button.textContent = 'Leave Room: ' + CURRENTROOM;
+            button.addEventListener('click', function () {
+                // Function to execute when the button is clicked
+                leaveRoom(CURRENTROOM);
+            });
+            roomsContainer.appendChild(button);
 
-    await JoinRoom();
-    await connection.invoke("JoinRoom", CURRENTROOM, currentUser);
+            await JoinRoom();
+            console.log("==============");
+            await connection.invoke("JoinRoom", CURRENTROOM, currentUser);
+        });
 }
 
 function leaveRoom(roomname) {
-    console.log('Leaving room: ' + roomname);
-    connection.invoke('LeaveRoom', myName);
+    //console.log('Leaving room: ' + roomname);
+    if (roomname.trim() == '') return;
+    chat.style.display = "none";
+    connection.invoke('LeaveRoom', roomname, myName);
     document.body.innerHTML = "Left ROOM!";;
 }
 
@@ -83,14 +100,16 @@ function showNotification(notification, color) {
 async function JoinRoom() {
     try {
         await connection.start();
+        console.log('Connection started');
 
+        //console.log(data);
         $.get("https://localhost:7115/Room?room=" + CURRENTROOM, function (data, status) {
-            console.log(data);
+            //console.log(data);
             roomname.innerText = `Room : ${CURRENTROOM}`;
+            chat.style.display = "block";
             offerValueMessage.innerHTML = `Begin PRICE for ${CURRENTROOM} $ ` + data;
         });
 
-        console.log("SignalR Connected");
     }
     catch (err) {
         console.log(err);
@@ -101,6 +120,7 @@ async function JoinRoom() {
 }
 
 async function IncreaseOffer() {
+    offerOwner = myName;
     clearTimeout(clearInterval);
     $.get(`https://localhost:7115/IncreaseRoom?room=${CURRENTROOM}&number=100`)
         .done(async function (data) {
@@ -115,15 +135,14 @@ async function IncreaseOffer() {
 }
 
 function startTimer() {
-    totalseconds = 37;
+    totalseconds = 10;
     clearInterval = setInterval(async () => {
         --totalseconds;
         time.innerHTML = totalseconds;
         if (totalseconds <= 0) {
             button.disabled = false;
             clearTimeout(clearInterval);
-            button.disabled = true;
-            console.log(CURRENTROOM + " " + myName + " " + lastOffer);
+            //console.log(CURRENTROOM + " " + myName + " " + lastOffer);
             await connection.invoke("SendWinnerMessage", CURRENTROOM, offerOwner, lastOffer.toString());
             // Finish group;
         }
@@ -138,20 +157,22 @@ const connection = new signalR.HubConnectionBuilder()
     .configureLogging(signalR.LogLevel.Information)
     .build();
 
-connection.on("ReceiveOffer", (message, data) => {
-    data += 100;
-    currentValue.innerHTML = message + data;
-    button.disabled = false;
-    totalseconds = 0;
-    clearTimeout(clearInterval);
-    timeSection.style.display = "none";
-})
+// connection.on("ReceiveOffer", (message, data) => {
+//     data += 100;
+//     currentValue.innerHTML = message + data + "123";
+//     button.disabled = false;
+//     totalseconds = 0;
+//     clearTimeout(clearInterval);
+//     timeSection.style.display = "none";
+// })
 
 connection.on("RecieveRoomMessage", (message, data) => {
     currentValue.innerHTML = message + "\n with this offer : " + data + "$";
-    console.log('OFFER ' + data);
+    //console.log('OFFER ' + data);
     offerOwner = message;
+    console.log("OFFER OWNER : " + offerOwner);
     lastOffer = data;
+    button.disabled = false;
     clearTimeout(clearInterval);
     startTimer();
     // button.disabled = true;
@@ -159,22 +180,58 @@ connection.on("RecieveRoomMessage", (message, data) => {
 })
 
 connection.on("ReceiveJoinInfo", (user) => {
-    console.log(`${user} connected to our room.`);
+    //console.log(`${user} connected to our room.`);
     showNotification(`${user} connected to our room.`, "green"); // Display message with blue color
 })
 
 connection.on("UserExited", (user) => {
-    console.log(`${user} disconnected from our room.`);
+    //console.log(`${user} disconnected from our room.`);
     showNotification(`${user} disconnected from our room.`, "red"); // Display message with blue color
 })
 
 connection.on("ReceiveInfo", (room, username, offer) => {
-    console.log("TRY 2" + room + " " + username + " " + offer);
+    //console.log("TRY 2" + room + " " + username + " " + offer);
     document.body.innerHTML = `GAME OVER !\n ${username} is the winner of the room ${room} with the bid of ${offer}`;
 });
 
 connection.onclose(async () => {
-    leaveRoom();
+    leaveRoom(CURRENTROOM);
 })
 
+connection.on("ReceiveUserMessage",(name, message) =>{
+    addMessage(name, message);
+})
+
+window.addEventListener('beforeunload', function (event) {
+    leaveRoom(CURRENTROOM);
+});
+
 GetRooms();
+
+
+// Сhat
+
+
+// Handle the send button click event
+sendButton.addEventListener('click', function() {
+    // Get the entered message
+    const message = messageInput.value;
+    // Clear the input field
+    messageInput.value = '';
+    addMessage(myName, message);
+    // Scroll the chat container to the bottom
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    sendMessage(myName, message);
+});
+
+function addMessage(user, message){
+    // Append the message to the chat container
+    const messageElement = document.createElement('p');
+    messageElement.textContent = `· ${user} : ${message}`;
+    chatContainer.appendChild(messageElement);
+}
+
+async function sendMessage(name, message){
+    await connection.invoke("SendUserMessage", CURRENTROOM.toString(), name.toString(), message.toString());
+}

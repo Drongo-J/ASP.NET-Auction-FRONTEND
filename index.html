@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">    
 </head>
 
 <body>
@@ -16,6 +16,8 @@
     </section>
 
     <section id="room" style="display: none;">
+
+        <h2 id="name" style="color: aqua;"></h2>
 
         <h2 id="roomname" style="color: blue;"></h2>
 
@@ -39,6 +41,15 @@
     <div id="notificationBox">
         <p style="text-decoration: underline; font-size: medium; font-size: 20px;">Notification Box</p>
         <div id="notificationContainer"></div>
+    </div>
+
+    <div id="chatBox" style="display: none;">
+        <p style="text-decoration: underline; font-size: medium; font-size: 20px;">Chat</p>
+        <div id="chatContainer"></div>
+        <div id="inputContainer">
+            <input type="text" id="messageInput" placeholder="Type your message..." />
+            <button id="sendButton">Send</button>
+        </div>
     </div>
 </body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
